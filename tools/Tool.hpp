@@ -1,3 +1,4 @@
+//Tool.hpp
 #pragma once
 #include <raylib-cpp.hpp>
 
@@ -11,4 +12,6 @@ public:
 
     virtual void Draw() = 0;
     virtual void DrawUI(int x, int y) {}
+
+    virtual void SetColor(const ::Color& color) { (void)color; }
 };

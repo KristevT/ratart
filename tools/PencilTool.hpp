@@ -1,3 +1,4 @@
+//PencilTool.hp
 #pragma once
 #include "Tool.hpp"
 #include <vector>
@@ -11,7 +12,7 @@ struct Stroke {
 class PencilTool : public Tool {
 public:
     Color color = BLACK;
-    float size = 4.0f;
+    float size = 5.0f;
 
     std::vector<Stroke> strokes;
     Stroke* currentStroke = nullptr;
@@ -22,4 +23,6 @@ public:
 
     void Draw() override;
     void DrawUI(int x, int y) override;
+
+    void SetColor(const Color& c) override { color = c; }
 };

@@ -1,3 +1,4 @@
+//PencilTool.cpp
 #include "PencilTool.hpp"
 #include <raylib.h>
 
@@ -39,10 +40,10 @@ void PencilTool::Draw() {
 }
 
 void PencilTool::DrawUI(int x, int y) {
-    DrawText(TextFormat("Size: %dpx", (int)size), x, y, 20, BLACK);
-    DrawRectangle(x, y + 30, 100, 10, LIGHTGRAY);
-    DrawRectangle(x, y + 30, (int)size, 10, BLACK);
+    DrawText(TextFormat("Size: %dpx", (int)size), x, y, 16, BLACK);
+    DrawRectangle(x, y + 20, 100, 15, LIGHTGRAY);
+    DrawRectangle(x, y + 20, (int)size, 15, BLACK);
 
-    if (IsKeyDown(KEY_LEFT_BRACKET) && size > 1) size -= 0.5f;
-    if (IsKeyDown(KEY_RIGHT_BRACKET) && size < 100) size += 0.5f;
+    if (IsKeyDown(KEY_LEFT_BRACKET) && size > 1) size -= 0.25f;
+    if (IsKeyDown(KEY_RIGHT_BRACKET) && size < 100) size += 0.25f;
 }
