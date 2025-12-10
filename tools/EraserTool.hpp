@@ -1,21 +1,19 @@
-// PencilTool.hpp
+// EraserTool.hpp
 #pragma once
 #include "Tool.hpp"
 #include <vector>
 
-struct Stroke {
+struct EraseStroke {
     std::vector<Vector2> points;
-    Color color;
     float size;
 };
 
-class PencilTool : public Tool {
+class EraserTool : public Tool {
 public:
-    Color color = BLACK;
-    float size = 5.0f;
+    float size = 20.0f;
 
-    std::vector<Stroke> strokes;
-    Stroke* currentStroke = nullptr;
+    std::vector<EraseStroke> strokes;
+    EraseStroke* currentStroke = nullptr;
 
     void OnMouseDown(Vector2 pos) override;
     void OnMouseHold(Vector2 pos) override;
@@ -24,6 +22,4 @@ public:
     void Draw() override;
     void DrawUI(int x, int y) override;
     void DrawPreview(Vector2 mouse) override;
-
-    void SetColor(const Color& c) override { color = c; }
 };

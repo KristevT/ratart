@@ -11,7 +11,8 @@ public:
     virtual void OnMouseUp(Vector2 pos) = 0;
 
     virtual void Draw() = 0;
-    virtual void DrawUI(int x, int y) {}
+    virtual void DrawUI(int /*x*/, int /*y*/) {}
+    virtual void DrawPreview(Vector2 /*mouse*/) {}
 
     virtual void SetColor(const ::Color& color) { (void)color; }
 };

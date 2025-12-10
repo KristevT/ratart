@@ -14,7 +14,8 @@ LDLIBS = -lraylib -lopengl32 -lgdi32 -lwinmm
 # Source files
 SRC = \
     main.cpp \
-    tools/PencilTool.cpp
+    tools/PencilTool.cpp \
+	tools/EraserTool.cpp
 
 # Output executable
 OUT = ratart.exe

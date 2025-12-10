@@ -4,6 +4,7 @@
 #include <vector>
 #include "tools/Tool.hpp"
 #include "tools/PencilTool.hpp"
+#include "tools/EraserTool.hpp"
 
 Color g_SelectedColor = BLACK;
 float g_ColorValue = 1.0f;
@@ -71,6 +72,9 @@ struct ToolButton {
     KeyboardKey shortcut;
     enum ToolID { PENCIL, ERASER, DROPPER, BUCKET, SQUARE, CIRCLE } id;
     Texture2D icon;
+
+    ToolButton(std::string n, std::string i, KeyboardKey s, ToolID tid)
+        : name(n), iconPath(i), shortcut(s), id(tid) {}
 };
 
 struct MenuItem {
@@ -85,30 +89,39 @@ struct MenuTab {
     bool open = false;
 };
 
+struct CanvasStroke {
+    std::vector<Vector2> points;
+    float size;
+    Color color;
+    bool erased = false;
+};
+
+std::vector<CanvasStroke> g_CanvasStrokes;
+CanvasStroke* g_CurrentStroke = nullptr;
+
 int main() {
     const int screenWidth = 1200;
     const int screenHeight = 800;
+    const int menuBarHeight = 25;
+    const int toolbarWidth = 150;
 
     raylib::Window window(screenWidth, screenHeight, "ratart - Simple Drawing App");
     SetTargetFPS(60);
 
-    const int menuBarHeight = 25;
-    const int toolbarWidth = 150;
-
     // Current tool (Pencil by default)
     std::unique_ptr<PencilTool> pencilTool = std::make_unique<PencilTool>();
-    // std::unique_ptr<EraserTool> eraserTool = std::make_unique<EraserTool>();
+    std::unique_ptr<EraserTool> eraserTool = std::make_unique<EraserTool>();
     // ...
 
     Tool* currentTool = pencilTool.get();
 
     std::vector<ToolButton> toolButtons = {
-        { "Pencil",  "icons/pencil.png",  {}, KEY_P, ToolButton::PENCIL },
-        { "Eraser",  "icons/eraser.png",  {}, KEY_E, ToolButton::ERASER },
-        { "Dropper", "icons/dropper.png", {}, KEY_I, ToolButton::DROPPER },
-        { "Bucket",  "icons/bucket.png",  {}, KEY_K, ToolButton::BUCKET },
-        { "Square",  "icons/square.png",  {}, KEY_S, ToolButton::SQUARE },
-        { "Circle",  "icons/circle.png",  {}, KEY_C, ToolButton::CIRCLE }
+        { "Pencil",  "icons/pencil.png", KEY_B, ToolButton::PENCIL },
+        { "Eraser",  "icons/eraser.png", KEY_E, ToolButton::ERASER },
+        { "Dropper", "icons/dropper.png", KEY_I, ToolButton::DROPPER },
+        { "Bucket",  "icons/bucket.png", KEY_K, ToolButton::BUCKET },
+        { "Square",  "icons/square.png", KEY_S, ToolButton::SQUARE },
+        { "Circle",  "icons/circle.png", KEY_C, ToolButton::CIRCLE }
     };
 
     // Load icons
@@ -153,7 +166,7 @@ int main() {
             if (IsKeyPressed(b.shortcut)) {
                 switch (b.id) {
                     case ToolButton::PENCIL: currentTool = pencilTool.get(); break;
-                    case ToolButton::ERASER: /* currentTool = eraserTool.get(); */ break;
+                    case ToolButton::ERASER: currentTool = eraserTool.get(); break;
                     case ToolButton::DROPPER: /* currentTool = dropperTool.get(); */ break;
                     case ToolButton::BUCKET: /* currentTool = bucketTool.get(); */ break;
                     case ToolButton::SQUARE: /* currentTool = squareTool.get(); */ break;
@@ -163,13 +176,24 @@ int main() {
         }
 
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground(WHITE);
 
         // DRAWING SURFACE
         DrawRectangle(toolbarWidth, menuBarHeight, screenWidth - toolbarWidth, screenHeight - menuBarHeight, RAYWHITE);
         DrawRectangleLines(toolbarWidth, menuBarHeight, screenWidth - toolbarWidth, screenHeight - menuBarHeight, LIGHTGRAY);
 
-        currentTool->Draw();
+        for (auto& stroke : g_CanvasStrokes) {
+            if (stroke.erased) continue;
+
+            if (stroke.points.size() < 2) continue;
+
+            for (size_t i = 1; i < stroke.points.size(); i++) {
+                DrawLineEx(stroke.points[i - 1], stroke.points[i], stroke.size, stroke.color);
+                DrawCircleV(stroke.points[i], stroke.size / 2, stroke.color);
+            }
+        }
+
+        currentTool->DrawPreview(mouse);
 
         // TOOL BAR
         DrawRectangle(0, menuBarHeight, toolbarWidth, screenHeight - menuBarHeight, ColorFromHSV(0, 0, 25));
@@ -213,7 +237,7 @@ int main() {
         int startX = toolbarWidth * 0.1;
         int startY = toolSectionHeight + 45;
 
-        for (int i = 0; i < toolButtons.size(); i++) {
+        for (size_t i = 0; i < toolButtons.size(); i++) {
             int row = i / cols;
             int col = i % cols;
 
@@ -240,7 +264,7 @@ int main() {
             if (CheckCollisionPointRec(mouse, b.rect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 switch (b.id) {
                     case ToolButton::PENCIL: currentTool = pencilTool.get(); break;
-                    case ToolButton::ERASER: /* currentTool = eraserTool.get(); */ break;
+                    case ToolButton::ERASER: currentTool = eraserTool.get(); break;
                     case ToolButton::DROPPER: /* currentTool = dropperTool.get(); */ break;
                     case ToolButton::BUCKET: /* currentTool = bucketTool.get(); */ break;
                     case ToolButton::SQUARE: /* currentTool = squareTool.get(); */ break;
@@ -255,11 +279,9 @@ int main() {
         // MENU BAR
         DrawRectangle(0, 0, screenWidth, menuBarHeight, LIGHTGRAY);
 
-        Vector2 m = GetMousePosition();
-
         // Draw tabs & handle clicks
         for (auto& tab : menu) {
-            Color bg = (tab.open || CheckCollisionPointRec(m, tab.rect)) ?
+            Color bg = (tab.open || CheckCollisionPointRec(mouse, tab.rect)) ?
                     GRAY :
                     LIGHTGRAY;
 
@@ -267,7 +289,7 @@ int main() {
             DrawText(tab.label.c_str(), tab.rect.x + menuBarHeight * 0.3, tab.rect.y + menuBarHeight * 0.1, menuBarHeight * 0.8, BLACK);
 
             // Toggle dropdown
-            if (CheckCollisionPointRec(m, tab.rect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (CheckCollisionPointRec(mouse, tab.rect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 for (auto& t : menu) t.open = false;
                 tab.open = true;
             }
@@ -277,7 +299,7 @@ int main() {
                 int itemHeight = 22;
                 int menuWidth = 180;
 
-                for (int i = 0; i < tab.items.size(); i++) {
+                for (size_t i = 0; i < tab.items.size(); i++) {
                     MenuItem& it = tab.items[i];
                     it.rect = {
                         tab.rect.x,
@@ -286,7 +308,7 @@ int main() {
                         (float)itemHeight
                     };
 
-                    Color bg2 = CheckCollisionPointRec(m, it.rect)
+                    Color bg2 = CheckCollisionPointRec(mouse, it.rect)
                                 ? Color{220, 220, 220, 255}
                                 : Color{245, 245, 245, 255};
 
@@ -295,7 +317,7 @@ int main() {
                     DrawText(it.label.c_str(), it.rect.x + 6, it.rect.y + 4, 16, BLACK);
 
                     // Placeholder functionality
-                    if (CheckCollisionPointRec(m, it.rect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    if (CheckCollisionPointRec(mouse, it.rect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                         printf("Menu clicked: %s -> %s\n", tab.label.c_str(), it.label.c_str());
                         tab.open = false;
                     }
@@ -308,9 +330,9 @@ int main() {
             bool clickedMenu = false;
 
             for (auto& tab : menu) {
-                if (CheckCollisionPointRec(m, tab.rect)) clickedMenu = true;
+                if (CheckCollisionPointRec(mouse, tab.rect)) clickedMenu = true;
                 for (auto& it : tab.items)
-                    if (CheckCollisionPointRec(m, it.rect)) clickedMenu = true;
+                    if (CheckCollisionPointRec(mouse, it.rect)) clickedMenu = true;
             }
 
             if (!clickedMenu)
@@ -318,18 +340,18 @@ int main() {
         }
 
         // Undo / Redo
-        DrawRectangleRec(undoBtn, CheckCollisionPointRec(m, undoBtn) ? GRAY : LIGHTGRAY);
-        DrawRectangleRec(redoBtn, CheckCollisionPointRec(m, redoBtn) ? GRAY : LIGHTGRAY);
+        DrawRectangleRec(undoBtn, CheckCollisionPointRec(mouse, undoBtn) ? GRAY : LIGHTGRAY);
+        DrawRectangleRec(redoBtn, CheckCollisionPointRec(mouse, redoBtn) ? GRAY : LIGHTGRAY);
 
         DrawText("Undo", undoBtn.x + menuBarHeight * 0.3, undoBtn.y + menuBarHeight * 0.1, menuBarHeight * 0.8, BLACK);
         DrawText("Redo", redoBtn.x + menuBarHeight * 0.3, redoBtn.y + menuBarHeight * 0.1 , menuBarHeight * 0.8, BLACK);
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            if (CheckCollisionPointRec(m, undoBtn)) {
+            if (CheckCollisionPointRec(mouse, undoBtn)) {
                 printf("Undo clicked\n");
                 // TODO: Undo logic
             }
-            if (CheckCollisionPointRec(m, redoBtn)) {
+            if (CheckCollisionPointRec(mouse, redoBtn)) {
                 printf("Redo clicked\n");
                 // TODO: Redo logic
             }
