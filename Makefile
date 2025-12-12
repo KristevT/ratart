@@ -3,17 +3,18 @@ CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra
 
 # Include directories
-INCLUDES = -Iraylib/include -Iraylib-cpp/include -Itools
+INCLUDES = -Iraylib/include -Iraylib-cpp/include -Itinyfiledialogs -Itools
 
 # Library directories
 LDFLAGS = -Lraylib/lib
 
 # Libraries to link
-LDLIBS = -lraylib -lopengl32 -lgdi32 -lwinmm
+LDLIBS = -lraylib -lopengl32 -lgdi32 -lwinmm -lole32 -luuid -lcomdlg32
 
 # Source files
 SRC = \
     main.cpp \
+	tinyfiledialogs/tinyfiledialogs.c \
     tools/PencilTool.cpp \
 	tools/EraserTool.cpp
 
