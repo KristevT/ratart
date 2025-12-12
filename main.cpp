@@ -5,6 +5,9 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <cstring>
+#include <cstdlib>
+#include <deque>
 #include "tools/Tool.hpp"
 #include "tools/PencilTool.hpp"
 #include "tools/EraserTool.hpp"
@@ -35,6 +38,20 @@ RenderTexture2D g_RenderTex = { 0 };
 
 std::string g_CurrentFile = "";
 bool g_HasUnsavedChanges = false;
+
+// --- Undo/Redo state snapshot ---
+struct AppState {
+    std::vector<CanvasStroke> strokes;
+
+    std::vector<unsigned char> bgPixels;
+    int bgW = 0;
+    int bgH = 0;
+    bool hasBg = false;
+};
+
+static std::deque<AppState> g_UndoStack;
+static std::deque<AppState> g_RedoStack;
+static const size_t kUndoLimit = 50;
 
 Image RenderCanvasImage(int canvasW, int canvasH);
 void File_New();
@@ -157,6 +174,8 @@ void File_New() {
     }
 
     g_CurrentFile.clear();
+    g_UndoStack.clear();
+    g_RedoStack.clear();
     g_HasUnsavedChanges = false;
 }
 
@@ -211,6 +230,8 @@ void File_Open() {
     RecreateRenderTex(g_BackgroundImage.width, g_BackgroundImage.height);
 
     g_CanvasStrokes.clear();
+    g_UndoStack.clear();
+    g_RedoStack.clear(); 
 
     g_CurrentFile = file;
     g_HasUnsavedChanges = false;
@@ -243,6 +264,93 @@ void File_Save() {
     DoExportImage(g_CurrentFile, canvasW, canvasH);
 
     g_HasUnsavedChanges = false;
+}
+
+// Helper to duplicate current background image pixels into vector
+static void CaptureBackgroundPixels(AppState &s) {
+    s.bgPixels.clear();
+    if (g_BackgroundImage.data != nullptr && g_BackgroundImage.width > 0 && g_BackgroundImage.height > 0) {
+        s.hasBg = true;
+        s.bgW = g_BackgroundImage.width;
+        s.bgH = g_BackgroundImage.height;
+        int bytes = s.bgW * s.bgH * 4;
+        unsigned char *src = (unsigned char*)g_BackgroundImage.data;
+        s.bgPixels.assign(src, src + bytes);
+    } else {
+        s.hasBg = false;
+        s.bgW = s.bgH = 0;
+    }
+}
+
+static void ApplyBackgroundFromState(const AppState &s) {
+    if (g_BackgroundTexture.id != 0) {
+        UnloadTexture(g_BackgroundTexture);
+        g_BackgroundTexture = {};
+    }
+    if (g_BackgroundImage.data != nullptr) {
+        UnloadImage(g_BackgroundImage);
+        g_BackgroundImage = {};
+    }
+
+    if (!s.hasBg) {
+        return;
+    }
+
+    int bytes = s.bgW * s.bgH * 4;
+    Image img = {};
+    img.width = s.bgW;
+    img.height = s.bgH;
+    img.mipmaps = 1;
+    img.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+    img.data = malloc(bytes);
+    if (!img.data) {
+        return;
+    }
+    memcpy(img.data, s.bgPixels.data(), bytes);
+
+    g_BackgroundImage = img;
+    g_BackgroundTexture = LoadTextureFromImage(g_BackgroundImage);
+    RecreateRenderTex(g_BackgroundImage.width, g_BackgroundImage.height);
+}
+
+static void PushState() {
+    AppState s;
+    s.strokes = g_CanvasStrokes;
+    CaptureBackgroundPixels(s);
+
+    g_UndoStack.push_back(std::move(s));
+    // cap size
+    while (g_UndoStack.size() > kUndoLimit) g_UndoStack.pop_front();
+    g_RedoStack.clear();
+}
+
+static void ApplyState(const AppState &s) {
+    g_CanvasStrokes = s.strokes;
+    ApplyBackgroundFromState(s);
+    g_HasUnsavedChanges = true;
+}
+
+static void DoUndo() {
+    if (g_UndoStack.empty()) return;
+    AppState current;
+    current.strokes = g_CanvasStrokes;
+    CaptureBackgroundPixels(current);
+    g_RedoStack.push_back(std::move(current));
+    AppState last = std::move(g_UndoStack.back());
+    g_UndoStack.pop_back();
+    ApplyState(last);
+}
+
+static void DoRedo() {
+    if (g_RedoStack.empty()) return;
+    AppState current;
+    current.strokes = g_CanvasStrokes;
+    CaptureBackgroundPixels(current);
+    g_UndoStack.push_back(std::move(current));
+
+    AppState next = std::move(g_RedoStack.back());
+    g_RedoStack.pop_back();
+    ApplyState(next);
 }
 
 
@@ -317,6 +425,7 @@ int main() {
     SetTargetFPS(60);
 
     RecreateRenderTex(g_ScreenWidth - toolbarWidth, g_ScreenHeight - menuBarHeight);
+    PushState();
 
     std::unique_ptr<PencilTool> pencilTool = std::make_unique<PencilTool>();
     std::unique_ptr<EraserTool> eraserTool = std::make_unique<EraserTool>();
@@ -404,6 +513,7 @@ int main() {
 
         if (insideCanvas) {
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                PushState();
                 currentTool->OnMouseDown(mouse);
                 g_HasUnsavedChanges = true;
             }
@@ -420,6 +530,12 @@ int main() {
         // shortkey tool switching
         if (IsKeyPressed(KEY_B)) currentTool = pencilTool.get();
         if (IsKeyPressed(KEY_E)) currentTool = eraserTool.get();
+        
+        // keyboard shortcuts for undo/redo
+        if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) {
+            if (IsKeyPressed(KEY_Z)) DoUndo();
+            if (IsKeyPressed(KEY_Y)) DoRedo();
+        }
 
         BeginDrawing();
         ClearBackground(WHITE);
@@ -548,8 +664,8 @@ int main() {
         DrawText("Undo", (int)(undoBtn.x + menuBarHeight*0.3f), (int)(undoBtn.y + menuBarHeight*0.1f), (int)(menuBarHeight*0.8f), BLACK);
         DrawText("Redo", (int)(redoBtn.x + menuBarHeight*0.3f), (int)(redoBtn.y + menuBarHeight*0.1f), (int)(menuBarHeight*0.8f), BLACK);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            if (CheckCollisionPointRec(mouse, undoBtn)) { /* TODO */ }
-            if (CheckCollisionPointRec(mouse, redoBtn)) { /* TODO */ }
+            if (CheckCollisionPointRec(mouse, undoBtn)) { DoUndo(); }
+            if (CheckCollisionPointRec(mouse, redoBtn)) { DoRedo(); }
         }
 
         EndDrawing();
