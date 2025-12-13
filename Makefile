@@ -16,7 +16,8 @@ SRC = \
     main.cpp \
 	tinyfiledialogs/tinyfiledialogs.c \
     tools/PencilTool.cpp \
-	tools/EraserTool.cpp
+	tools/EraserTool.cpp \
+	tools/DropperTool.cpp
 
 # Output executable
 OUT = ratart.exe

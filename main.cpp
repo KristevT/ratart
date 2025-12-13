@@ -11,11 +11,12 @@
 #include "tools/Tool.hpp"
 #include "tools/PencilTool.hpp"
 #include "tools/EraserTool.hpp"
+#include "tools/DropperTool.hpp"
 
 int g_ScreenWidth = 1200;
 int g_ScreenHeight = 800;
-const int menuBarHeight = 25;
-const int toolbarWidth = 150;
+int menuBarHeight = 25;
+int toolbarWidth = 150;
 
 Color g_SelectedColor = BLACK;
 float g_ColorValue = 1.0f;
@@ -429,6 +430,7 @@ int main() {
 
     std::unique_ptr<PencilTool> pencilTool = std::make_unique<PencilTool>();
     std::unique_ptr<EraserTool> eraserTool = std::make_unique<EraserTool>();
+    std::unique_ptr<DropperTool> dropperTool = std::make_unique<DropperTool>();
     Tool* currentTool = pencilTool.get();
 
     std::vector<std::string> iconPaths = {
@@ -457,8 +459,7 @@ int main() {
 
     std::vector<std::pair<std::string, std::vector<std::string>>> menu = {
         {"File", {"New", "Open", "Save", "Save As"}},
-        {"Edit", {"Copy","Cut","Paste"}},
-        {"Canvas", {"Change Canvas Size", "Change Canvas BG"}}
+        {"Edit", {"Change Canvas Size", "Change Canvas BG"}}
     };
 
     struct MenuTab { std::string label; Rectangle rect; std::vector<std::string> items; bool open; };
@@ -474,8 +475,8 @@ int main() {
         tabX += menuBarHeight * 2.0f;
     }
 
-    Rectangle undoBtn = { menuBarHeight * 7.5f, 0, menuBarHeight*2.5f, menuBarHeight };
-    Rectangle redoBtn = { menuBarHeight * 10.0f, 0, menuBarHeight*2.5f, menuBarHeight };
+    Rectangle undoBtn = { menuBarHeight * 4.0f, 0, menuBarHeight*2.5f, menuBarHeight };
+    Rectangle redoBtn = { menuBarHeight * 6.5f, 0, menuBarHeight*2.5f, menuBarHeight };
 
     while (!WindowShouldClose()) {
         Vector2 mouse = GetMousePosition();
@@ -530,6 +531,7 @@ int main() {
         // shortkey tool switching
         if (IsKeyPressed(KEY_B)) currentTool = pencilTool.get();
         if (IsKeyPressed(KEY_E)) currentTool = eraserTool.get();
+        if (IsKeyPressed(KEY_I)) currentTool = dropperTool.get();
         
         // keyboard shortcuts for undo/redo
         if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) {
@@ -600,6 +602,7 @@ int main() {
             if (CheckCollisionPointRec(mouse, b.rect) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 if (i == 0) currentTool = pencilTool.get();
                 else if (i == 1) currentTool = eraserTool.get();
+                else if (i == 2) currentTool = dropperTool.get();
             }
         }
 
