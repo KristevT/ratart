@@ -12,6 +12,8 @@
 #include "tools/PencilTool.hpp"
 #include "tools/EraserTool.hpp"
 #include "tools/DropperTool.hpp"
+#include "tools/SquareTool.hpp"
+#include "tools/CircleTool.hpp"
 
 int g_ScreenWidth = 1200;
 int g_ScreenHeight = 800;
@@ -431,6 +433,8 @@ int main() {
     std::unique_ptr<PencilTool> pencilTool = std::make_unique<PencilTool>();
     std::unique_ptr<EraserTool> eraserTool = std::make_unique<EraserTool>();
     std::unique_ptr<DropperTool> dropperTool = std::make_unique<DropperTool>();
+    std::unique_ptr<SquareTool> squareTool = std::make_unique<SquareTool>();
+    std::unique_ptr<CircleTool> circleTool = std::make_unique<CircleTool>();
     Tool* currentTool = pencilTool.get();
 
     std::vector<std::string> iconPaths = {
@@ -532,6 +536,8 @@ int main() {
         if (IsKeyPressed(KEY_B)) currentTool = pencilTool.get();
         if (IsKeyPressed(KEY_E)) currentTool = eraserTool.get();
         if (IsKeyPressed(KEY_I)) currentTool = dropperTool.get();
+        if (IsKeyPressed(KEY_S)) currentTool = squareTool.get();
+        if (IsKeyPressed(KEY_C)) currentTool = circleTool.get();
         
         // keyboard shortcuts for undo/redo
         if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) {
@@ -603,6 +609,8 @@ int main() {
                 if (i == 0) currentTool = pencilTool.get();
                 else if (i == 1) currentTool = eraserTool.get();
                 else if (i == 2) currentTool = dropperTool.get();
+                else if (i == 4) currentTool = squareTool.get();
+                else if (i == 5) currentTool = circleTool.get();
             }
         }
 
